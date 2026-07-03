@@ -4,6 +4,44 @@ This experiment fine-tunes the unconditional SDFusion denoiser with pure CMF-sty
 
 Run from the `SDFusion` directory. Replace dataset and checkpoint paths with the paths available on the experiment server.
 
+## Current Findings
+
+The strongest pure-CMF setting so far is:
+
+```bash
+--loss-type ddim_endpoint_multistep_rollout_fm
+--train-ddim-steps 10
+--rollout-hops 4
+--r-cond-mode delta_add
+--time-param normalized
+--time-sampler ddim_endpoint_pair
+--loss-kind huber
+--huber-beta 0.01
+--lr 5e-9
+```
+
+On the chair runs, CMF 10-step sampling was about 4.7x faster than baseline 50-step sampling and was much more stable than earlier MSE/random-hop variants. It still did not rigorously match baseline 50-step quality: a few samples kept small fragments or rough geometry.
+
+On the table run, the same setting transferred without widespread collapse and kept a similar speed gain, but visual quality was weaker than chair and still below baseline 50-step.
+
+The current conclusion is negative-to-mixed but usable for a course project: pure CMF can make SDFusion 10-step generation substantially faster and more stable, but without teacher distillation it has not yet fully reached 50-step baseline quality.
+
+## Recommended Scripts
+
+The scripts below wrap the recommended setting. They require `DATA_ROOT` and can optionally override `OUT_DIR`, `BASE_CKPT`, `VQ_CKPT`, `ITERS`, and `SEED`.
+
+```bash
+DATA_ROOT=/path/to/shapenet_data \
+OUT_DIR=/path/to/cfm_sdfusion \
+bash experiments/run_cmf_chair_huber.sh
+```
+
+```bash
+DATA_ROOT=/path/to/shapenet_data \
+OUT_DIR=/path/to/cfm_sdfusion \
+bash experiments/run_cmf_table_huber.sh
+```
+
 ## Chair
 
 Smoke test:
