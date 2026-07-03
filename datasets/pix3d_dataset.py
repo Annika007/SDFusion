@@ -70,7 +70,7 @@ class RandomPermuteRGB(object):
         return rendering_images
 
 class Pix3DImg2ShapeDataset(BaseDataset):
-    def initialize(self, opt, phase='train', cat='chair', input_txt=None, by_imgs=True):
+    def initialize(self, opt, phase='train', cat='chair', res=None, input_txt=None, by_imgs=True):
         self.opt = opt
         self.max_dataset_size = opt.max_dataset_size
         self.phase = phase

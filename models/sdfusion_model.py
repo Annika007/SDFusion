@@ -79,7 +79,7 @@ class SDFusionModel(BaseModel):
         if self.isTrain:
 
             # initialize optimizers
-            self.optimizer = optim.AdamW([p for p in self.df.parameters() if p.requires_grad == True], lr=opt.lr)
+            self.optimizer = optim.AdamW([p for p in self.df.parameters() if p.requires_grad == True], lr=opt.lr, foreach=False)
             self.scheduler = optim.lr_scheduler.StepLR(self.optimizer, 1000, 0.9)
 
             self.optimizers = [self.optimizer]
@@ -146,7 +146,7 @@ class SDFusionModel(BaseModel):
         # ref: ddpm.py, register_schedule
         self.register_schedule()
         logvar_init = 0.
-        self.logvar = torch.full(fill_value=logvar_init, size=(self.num_timesteps,))
+        self.logvar = torch.full(fill_value=logvar_init, size=(self.num_timesteps,), device=self.device)
         self.scale = scale # default for uncond
 
     def register_schedule(self, given_betas=None, beta_schedule="linear", timesteps=1000,
