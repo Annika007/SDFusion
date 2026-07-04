@@ -1,0 +1,8 @@
+{
+  "prompt": "A modern sofa",
+  "prompt_slug": "a-modern-sofa",
+  "uc_scale": 2.0,
+  "ngen": 4,
+  "ddim_steps": 100,
+  "ddim_eta": 0.0
+}

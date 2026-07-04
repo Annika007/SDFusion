@@ -412,7 +412,8 @@ class SDFusionMultiModal2ShapeModel(BaseModel):
     @torch.no_grad()
     # def inference(self, data, sample=True, ddim_steps=None, ddim_eta=0., quantize_denoised=True, infer_all=False):
     def inference(self, data, ddim_steps=None, ddim_eta=0., uc_scale=None,
-                  infer_all=False, max_sample=16):
+                  infer_all=False, max_sample=16, pyramid_list=None,
+                  pyramid_interp_mode=None, pyramid_use_up_v2=False):
 
         self.switch_eval()
 
@@ -452,7 +453,10 @@ class SDFusionMultiModal2ShapeModel(BaseModel):
                                                         unconditional_guidance_scale=uc_scale,
                                                         unconditional_conditioning=mm_uc_feat,
                                                         eta=ddim_eta,
-                                                        quantize_x0=False)
+                                                        quantize_x0=False,
+                                                        pyramid_list=pyramid_list,
+                                                        pyramid_interp_mode=pyramid_interp_mode,
+                                                        pyramid_use_up_v2=pyramid_use_up_v2)
 
         self.gen_df = self.vqvae_module.decode_no_quant(samples)
         self.switch_train()
@@ -462,7 +466,8 @@ class SDFusionMultiModal2ShapeModel(BaseModel):
     #         mm_cls_free=False,
     #     ):
     def mm_inference(self, data, mask_mode=None, ddim_steps=None, ddim_eta=0., uc_scale=None, 
-                  txt_scale=1.0, img_scale=1.0, mm_cls_free=False, infer_all=False, max_sample=16):
+                  txt_scale=1.0, img_scale=1.0, mm_cls_free=False, infer_all=False, max_sample=16,
+                  pyramid_list=None, pyramid_interp_mode=None, pyramid_use_up_v2=False):
     
         self.switch_eval()
 
@@ -523,7 +528,10 @@ class SDFusionMultiModal2ShapeModel(BaseModel):
                                                             mask=z_mask,
                                                             unconditional_guidance_scale=uc_scale,
                                                             unconditional_conditioning=mm_uc_feat,
-                                                            eta=ddim_eta,)
+                                                            eta=ddim_eta,
+                                                            pyramid_list=pyramid_list,
+                                                            pyramid_interp_mode=pyramid_interp_mode,
+                                                            pyramid_use_up_v2=pyramid_use_up_v2)
         else:
             c_mm = {
                 'c_img': c_img,
@@ -545,7 +553,10 @@ class SDFusionMultiModal2ShapeModel(BaseModel):
                                                 unconditional_guidance_scale=uc_scale,
                                                 unconditional_conditioning=uc_mm,
                                                 eta=ddim_eta,
-                                                mm_cls_free=True)
+                                                mm_cls_free=True,
+                                                pyramid_list=pyramid_list,
+                                                pyramid_interp_mode=pyramid_interp_mode,
+                                                pyramid_use_up_v2=pyramid_use_up_v2)
 
         self.gen_df = self.vqvae_module.decode_no_quant(samples)
 

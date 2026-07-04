@@ -362,7 +362,8 @@ class SDFusionImage2ShapeModel(BaseModel):
     # check: ddpm.py, log_images(). line 1317~1327
     @torch.no_grad()
     def inference(self, data, ddim_steps=None, ddim_eta=0., uc_scale=None,
-                  infer_all=False, max_sample=16):
+                  infer_all=False, max_sample=16, pyramid_list=None,
+                  pyramid_interp_mode=None, pyramid_use_up_v2=False):
 
         self.switch_eval()
 
@@ -390,7 +391,10 @@ class SDFusionImage2ShapeModel(BaseModel):
                                                         unconditional_guidance_scale=uc_scale,
                                                         unconditional_conditioning=uc,
                                                         eta=ddim_eta,
-                                                        quantize_x0=False)
+                                                        quantize_x0=False,
+                                                        pyramid_list=pyramid_list,
+                                                        pyramid_interp_mode=pyramid_interp_mode,
+                                                        pyramid_use_up_v2=pyramid_use_up_v2)
 
 
         self.gen_df = self.vqvae_module.decode_no_quant(samples)
@@ -399,7 +403,8 @@ class SDFusionImage2ShapeModel(BaseModel):
 
     @torch.no_grad()
     def img2shape(self, image, mask, ddim_steps=None, ddim_eta=0., uc_scale=None,
-                  infer_all=False, max_sample=16):
+                  infer_all=False, max_sample=16, pyramid_list=None,
+                  pyramid_interp_mode=None, pyramid_use_up_v2=False):
         #######################
         ### preprocess data ###
         from utils.demo_util import preprocess_image
@@ -440,7 +445,10 @@ class SDFusionImage2ShapeModel(BaseModel):
                                                         unconditional_guidance_scale=uc_scale,
                                                         unconditional_conditioning=uc,
                                                         eta=ddim_eta,
-                                                        quantize_x0=False)
+                                                        quantize_x0=False,
+                                                        pyramid_list=pyramid_list,
+                                                        pyramid_interp_mode=pyramid_interp_mode,
+                                                        pyramid_use_up_v2=pyramid_use_up_v2)
 
 
         self.gen_df = self.vqvae_module.decode_no_quant(samples)

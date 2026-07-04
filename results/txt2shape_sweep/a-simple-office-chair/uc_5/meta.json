@@ -1,0 +1,8 @@
+{
+  "prompt": "A simple office chair",
+  "prompt_slug": "a-simple-office-chair",
+  "uc_scale": 5.0,
+  "ngen": 4,
+  "ddim_steps": 100,
+  "ddim_eta": 0.0
+}

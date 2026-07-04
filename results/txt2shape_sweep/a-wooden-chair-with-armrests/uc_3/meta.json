@@ -1,0 +1,8 @@
+{
+  "prompt": "A wooden chair with armrests",
+  "prompt_slug": "a-wooden-chair-with-armrests",
+  "uc_scale": 3.0,
+  "ngen": 4,
+  "ddim_steps": 100,
+  "ddim_eta": 0.0
+}

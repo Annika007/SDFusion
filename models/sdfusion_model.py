@@ -328,7 +328,8 @@ class SDFusionModel(BaseModel):
     # check: ddpm.py, log_images(). line 1317~1327
     @torch.no_grad()
     def inference(self, data, sample=True, ddim_steps=None, ddim_eta=0., quantize_denoised=True,
-                  infer_all=False, max_sample=16):
+                  infer_all=False, max_sample=16, pyramid_list=None, pyramid_interp_mode=None,
+                  pyramid_use_up_v2=False):
 
         self.df.eval()
 
@@ -358,7 +359,10 @@ class SDFusionModel(BaseModel):
                                                      verbose=False,
                                                      unconditional_guidance_scale=scale,
                                                     #  unconditional_conditioning=uc,
-                                                     eta=ddim_eta)
+                                                     eta=ddim_eta,
+                                                     pyramid_list=pyramid_list,
+                                                     pyramid_interp_mode=pyramid_interp_mode,
+                                                     pyramid_use_up_v2=pyramid_use_up_v2)
 
 
         # decode z
@@ -367,7 +371,8 @@ class SDFusionModel(BaseModel):
         self.df.train()
 
     @torch.no_grad()
-    def uncond(self, ngen=1, ddim_steps=200, ddim_eta=0., scale=None):
+    def uncond(self, ngen=1, ddim_steps=200, ddim_eta=0., scale=None, pyramid_list=None,
+               pyramid_interp_mode=None, pyramid_use_up_v2=False):
         ddim_sampler = DDIMSampler(self)
 
         if scale is None:
@@ -388,7 +393,10 @@ class SDFusionModel(BaseModel):
                                                      verbose=False,
                                                      unconditional_guidance_scale=scale,
                                                     #  unconditional_conditioning=uc,
-                                                     eta=ddim_eta)
+                                                     eta=ddim_eta,
+                                                     pyramid_list=pyramid_list,
+                                                     pyramid_interp_mode=pyramid_interp_mode,
+                                                     pyramid_use_up_v2=pyramid_use_up_v2)
 
 
         # decode z
@@ -396,7 +404,8 @@ class SDFusionModel(BaseModel):
         return self.gen_df
 
     @torch.no_grad()
-    def shape_comp(self, shape, xyz_dict, ngen=1, ddim_steps=100, ddim_eta=0.0, scale=None):        
+    def shape_comp(self, shape, xyz_dict, ngen=1, ddim_steps=100, ddim_eta=0.0, scale=None,
+                   pyramid_list=None, pyramid_interp_mode=None, pyramid_use_up_v2=False):        
         from utils.demo_util import get_partial_shape
         ddim_sampler = DDIMSampler(self)
         
@@ -436,7 +445,10 @@ class SDFusionModel(BaseModel):
                                                      mask=z_mask,
                                                      unconditional_guidance_scale=scale,
                                                     #  unconditional_conditioning=uc,
-                                                     eta=ddim_eta)
+                                                     eta=ddim_eta,
+                                                     pyramid_list=pyramid_list,
+                                                     pyramid_interp_mode=pyramid_interp_mode,
+                                                     pyramid_use_up_v2=pyramid_use_up_v2)
 
 
         # decode z

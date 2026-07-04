@@ -1,0 +1,4 @@
+--2026-06-10 20:09:05--  https://github.com/openai/CLIP/raw/main/clip/bpe_simple_vocab_16e6.txt.gz
+Resolving github.com (github.com)... 20.205.243.166
+Connecting to github.com (github.com)|20.205.243.166|:443... connected.
+Unable to establish SSL connection.

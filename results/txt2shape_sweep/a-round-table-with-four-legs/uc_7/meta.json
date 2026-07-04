@@ -1,0 +1,8 @@
+{
+  "prompt": "A round table with four legs",
+  "prompt_slug": "a-round-table-with-four-legs",
+  "uc_scale": 7.0,
+  "ngen": 4,
+  "ddim_steps": 100,
+  "ddim_eta": 0.0
+}

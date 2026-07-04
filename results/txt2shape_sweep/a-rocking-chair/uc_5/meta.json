@@ -1,0 +1,8 @@
+{
+  "prompt": "A rocking chair",
+  "prompt_slug": "a-rocking-chair",
+  "uc_scale": 5.0,
+  "ngen": 4,
+  "ddim_steps": 100,
+  "ddim_eta": 0.0
+}

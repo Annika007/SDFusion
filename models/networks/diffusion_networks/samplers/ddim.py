@@ -2,6 +2,7 @@
 """ Reference: https://github.com/CompVis/latent-diffusion/tree/main/ldm/models/diffusion """
 
 import torch
+import torch.nn.functional as F
 import numpy as np
 from tqdm import tqdm
 from functools import partial
@@ -24,6 +25,47 @@ class DDIMSampler(object):
             if attr.device != torch.device("cuda"):
                 attr = attr.to(torch.device("cuda"))
         setattr(self, name, attr)
+
+    def _interpolate_spatial(self, x, size, mode=None):
+        if x.dim() == 4:
+            mode = mode or "bilinear"
+            if mode == "nearest":
+                return F.interpolate(x, size=size, mode=mode)
+            return F.interpolate(x, size=size, mode=mode, align_corners=False)
+        if x.dim() == 5:
+            mode = mode or "trilinear"
+            if mode == "nearest":
+                return F.interpolate(x, size=size, mode=mode)
+            return F.interpolate(x, size=size, mode=mode, align_corners=False)
+        return x
+
+    def _resize_conditioning(self, cond, size, mode=None):
+        if cond is None:
+            return None
+        if torch.is_tensor(cond):
+            if cond.dim() in (4, 5) and tuple(cond.shape[2:]) != tuple(size):
+                return self._interpolate_spatial(cond, size=size, mode=mode)
+            return cond
+        if isinstance(cond, list):
+            return [self._resize_conditioning(item, size, mode=mode) for item in cond]
+        if isinstance(cond, tuple):
+            return tuple(self._resize_conditioning(item, size, mode=mode) for item in cond)
+        if isinstance(cond, dict):
+            resized = {}
+            for key, value in cond.items():
+                if key in ("img_w", "txt_w"):
+                    resized[key] = value
+                else:
+                    resized[key] = self._resize_conditioning(value, size, mode=mode)
+            return resized
+        return cond
+
+    def _resize_mask(self, mask, size):
+        if mask is None:
+            return None
+        if torch.is_tensor(mask) and mask.dim() in (4, 5) and tuple(mask.shape[2:]) != tuple(size):
+            return self._interpolate_spatial(mask, size=size, mode="nearest")
+        return mask
 
     def make_schedule(self, ddim_num_steps, ddim_discretize="uniform", ddim_eta=0., verbose=True):
         self.ddim_timesteps = make_ddim_timesteps(ddim_discr_method=ddim_discretize, num_ddim_timesteps=ddim_num_steps,
@@ -79,6 +121,9 @@ class DDIMSampler(object):
                unconditional_guidance_scale=1.,
                unconditional_conditioning=None,
                mm_cls_free=False,
+               pyramid_list=None,
+               pyramid_interp_mode=None,
+               pyramid_use_up_v2=False,
                # this has to come in the same format as the conditioning, # e.g. as encoded tokens, ...
                **kwargs
                ):
@@ -103,6 +148,31 @@ class DDIMSampler(object):
         
         print(f'Data shape for DDIM sampling is {size}, eta {eta}')
 
+        if pyramid_list is not None:
+            return self.ddim_sampling_pyramid(
+                conditioning, size, pyramid_list,
+                x_T=x_T,
+                ddim_use_original_steps=False,
+                callback=callback,
+                timesteps=None,
+                quantize_denoised=quantize_x0,
+                mask=mask,
+                x0=x0,
+                img_callback=img_callback,
+                log_every_t=log_every_t,
+                temperature=temperature,
+                noise_dropout=noise_dropout,
+                score_corrector=score_corrector,
+                corrector_kwargs=corrector_kwargs,
+                unconditional_guidance_scale=unconditional_guidance_scale,
+                unconditional_conditioning=unconditional_conditioning,
+                mm_cls_free=mm_cls_free,
+                verbose=verbose,
+                eta=eta,
+                pyramid_interp_mode=pyramid_interp_mode,
+                pyramid_use_up_v2=pyramid_use_up_v2,
+            )
+
 
         samples, intermediates = self.ddim_sampling(conditioning, size,
                                                     callback=callback,
@@ -121,6 +191,100 @@ class DDIMSampler(object):
                                                     mm_cls_free=mm_cls_free,
                                                     )
         return samples, intermediates
+
+    @torch.no_grad()
+    def ddim_sampling_pyramid(self, cond, shape, pyramid_list,
+                              x_T=None, ddim_use_original_steps=False,
+                              callback=None, timesteps=None, quantize_denoised=False,
+                              mask=None, x0=None, img_callback=None, log_every_t=100,
+                              temperature=1., noise_dropout=0., score_corrector=None, corrector_kwargs=None,
+                              unconditional_guidance_scale=1., unconditional_conditioning=None,
+                              mm_cls_free=False, verbose=True, eta=0.,
+                              pyramid_interp_mode=None, pyramid_use_up_v2=False):
+        if len(shape) == 5:
+            spatial_dims = 3
+        elif len(shape) == 4:
+            spatial_dims = 2
+        else:
+            raise ValueError(f"Unsupported latent shape: {shape}")
+
+        if timesteps is None:
+            timesteps = self.ddpm_num_timesteps if ddim_use_original_steps else self.ddim_timesteps
+        elif timesteps is not None and not ddim_use_original_steps:
+            subset_end = int(min(timesteps / self.ddim_timesteps.shape[0], 1) * self.ddim_timesteps.shape[0]) - 1
+            timesteps = self.ddim_timesteps[:subset_end]
+
+        total_steps = timesteps if ddim_use_original_steps else timesteps.shape[0]
+        if len(pyramid_list) != total_steps:
+            raise ValueError(f"len(pyramid_list) must equal ddim steps, got {len(pyramid_list)} and {total_steps}")
+
+        device = self.model.betas.device
+        b = shape[0]
+        full_spatial = tuple(shape[2:])
+        coarse_spatial = tuple(max(1, full_spatial[i] // int(pyramid_list[-1])) for i in range(spatial_dims))
+
+        if x_T is None:
+            img = torch.randn((b, shape[1], *coarse_spatial), device=device)
+        else:
+            img = x_T
+            if tuple(img.shape[2:]) != coarse_spatial:
+                img = self._interpolate_spatial(img, coarse_spatial, mode=pyramid_interp_mode)
+
+        intermediates = {
+            'x_inter': [self._interpolate_spatial(img, full_spatial, mode=pyramid_interp_mode)],
+            'pred_x0': [self._interpolate_spatial(img, full_spatial, mode=pyramid_interp_mode)]
+        }
+
+        time_range = reversed(range(0, timesteps)) if ddim_use_original_steps else np.flip(timesteps)
+        if verbose:
+            print(f"Running pyramid DDIM Sampling with {total_steps} timesteps and pyramid {pyramid_list}")
+
+        iterator = tqdm(time_range, desc='Pyramid DDIM Sampler', total=total_steps)
+
+        for i, step in enumerate(iterator):
+            index = total_steps - i - 1
+            step_scale = int(pyramid_list[index])
+            step_spatial = tuple(max(1, full_spatial[d] // step_scale) for d in range(spatial_dims))
+
+            if tuple(img.shape[2:]) != step_spatial:
+                img = self._interpolate_spatial(img, step_spatial, mode=pyramid_interp_mode)
+
+            cond_step = self._resize_conditioning(cond, step_spatial, mode=pyramid_interp_mode)
+            mask_step = self._resize_mask(mask, step_spatial)
+            x0_step = self._resize_conditioning(x0, step_spatial, mode=pyramid_interp_mode)
+
+            ts = torch.full((b,), step, device=device, dtype=torch.long)
+            if mask_step is not None:
+                assert x0_step is not None
+                img_orig = self.model.q_sample(x0_step, ts)
+                img = img_orig * mask_step + (1. - mask_step) * img
+
+            img, pred_x0 = self.p_sample_ddim(
+                img, cond_step, ts, index=index, use_original_steps=ddim_use_original_steps,
+                quantize_denoised=quantize_denoised, temperature=temperature,
+                noise_dropout=noise_dropout, score_corrector=score_corrector,
+                corrector_kwargs=corrector_kwargs,
+                unconditional_guidance_scale=unconditional_guidance_scale,
+                unconditional_conditioning=unconditional_conditioning,
+                mm_cls_free=mm_cls_free,
+            )
+
+            if pyramid_use_up_v2 and index > 0 and int(pyramid_list[index - 1]) != step_scale:
+                next_scale = int(pyramid_list[index - 1])
+                next_spatial = tuple(max(1, full_spatial[d] // next_scale) for d in range(spatial_dims))
+                img = self._interpolate_spatial(img, next_spatial, mode=pyramid_interp_mode)
+                pred_x0 = self._interpolate_spatial(pred_x0, next_spatial, mode=pyramid_interp_mode)
+
+            if callback:
+                callback(i)
+            if img_callback:
+                img_callback(pred_x0, i)
+
+            if index % log_every_t == 0 or index == total_steps - 1:
+                intermediates['x_inter'].append(self._interpolate_spatial(img, full_spatial, mode=pyramid_interp_mode))
+                intermediates['pred_x0'].append(self._interpolate_spatial(pred_x0, full_spatial, mode=pyramid_interp_mode))
+
+        return img, intermediates
 
     @torch.no_grad()
     def ddim_sampling(self, cond, shape,
