@@ -268,7 +268,7 @@ def get_normalize_mesh(model_file, norm_mesh_sub_dir):
     centroid = np.mean(points_all, axis=0)
     points_all = points_all - centroid
     m = np.max(np.sqrt(np.sum(points_all ** 2, axis=1)))
-    if '/pix3d/' in model_file:
+    if FLAGS.dset == 'pix3d' or '/pix3d/' in model_file:
         model_basename = os.path.basename(model_file)
         pc_norm_name = model_basename.replace('model', 'pc_norm')
         obj_file = os.path.join(norm_mesh_sub_dir, pc_norm_name)
@@ -475,11 +475,14 @@ def create_sdf_pix3d(sdfcommand, marching_cube_command, LIB_command,
     # with open(gt_txt, 'r') as f:
     #     gt_lines = [l.strip('\n')[3:] for l in f.readlines()] # no ../
 
-    lst_dir
-    dataroot = lst_dir.split('/pix3d/filelists')[0]
-    with open(f'{dataroot}/pix3d/pix3d.json', 'r') as f:
+    if '/pix3d/filelists' in lst_dir:
+        pix3d_root = f"{lst_dir.split('/pix3d/filelists')[0]}/pix3d"
+    else:
+        pix3d_root = os.path.dirname(os.path.abspath(raw_dirs['mesh_dir']))
+
+    pix3d_json = os.path.join(pix3d_root, 'pix3d.json')
+    with open(pix3d_json, 'r') as f:
         pix3d_info = json.load(f)
-    pix3d_root = f'{dataroot}/pix3d'
 
     # map_input_to_info = {}
     # for d in pix3d_info:
@@ -860,7 +863,7 @@ if __name__ == "__main__":
 
     # lst_dir, cats, all_cats, raw_dirs = get_sdf_file_lst.get_all_info(dset)
 
-    info_file = '../dataset_info_files/info-shapenet.json'
+    info_file = f'../dataset_info_files/info-{dset}.json'
     with open(info_file) as json_file:
         info_data = json.load(json_file)
         lst_dir, cats, all_cats, raw_dirs = info_data["lst_dir"], info_data['cats'], info_data['all_cats'], info_data['raw_dirs_v1']
@@ -921,4 +924,3 @@ if __name__ == "__main__":
                    lst_dir, cats, raw_dirs,
                    iso_val, max_verts, ish5=True, normalize=True, g=0.00, reduce=reduce)
 
-    

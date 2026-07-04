@@ -96,7 +96,7 @@ class SDFusionImage2ShapeModel(BaseModel):
 
         if self.isTrain:
             # initialize optimizers
-            self.optimizer = optim.AdamW(trainable_params, lr=opt.lr)
+            self.optimizer = optim.AdamW(trainable_params, lr=opt.lr, foreach=False)
             self.scheduler = optim.lr_scheduler.StepLR(self.optimizer, 1000, 0.9)
 
             self.optimizers = [self.optimizer]
@@ -176,7 +176,7 @@ class SDFusionImage2ShapeModel(BaseModel):
         )
         
         logvar_init = 0.
-        self.logvar = torch.full(fill_value=logvar_init, size=(self.num_timesteps,))
+        self.logvar = torch.full(fill_value=logvar_init, size=(self.num_timesteps,), device=self.device)
         # for cls-free guidance
         self.uc_scale = uc_scale
         
